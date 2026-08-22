@@ -1,0 +1,320 @@
+.counter-page {
+  min-height: 100vh;
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+}
+
+.counter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.app-title {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.app-subtitle {
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.shift-badge {
+  padding: 10px 16px;
+  border-radius: 20px;
+  background: #eeeeee;
+  font-weight: 600;
+}
+
+.top-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.shift-box,
+.total-box {
+  padding: 18px;
+  border: 1px solid #dddddd;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.shift-box label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.shift-box select {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #cccccc;
+  border-radius: 8px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.shift-time {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.total-box {
+  text-align: center;
+}
+
+.total-label {
+  font-size: 14px;
+}
+
+.total-number {
+  font-size: 36px;
+  font-weight: 700;
+  margin: 4px 0;
+}
+
+.total-date {
+  font-size: 13px;
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.vehicle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.vehicle-card {
+  padding: 18px;
+  border: 1px solid #dddddd;
+  border-radius: 12px;
+  background: #ffffff;
+  text-align: center;
+}
+
+.vehicle-icon {
+  font-size: 28px;
+  margin-bottom: 5px;
+}
+
+.vehicle-name {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.vehicle-count {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 8px 0 12px;
+}
+
+.counter-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.counter-controls button {
+  width: 46px;
+  height: 42px;
+  border: none;
+  border-radius: 8px;
+  font-size: 24px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.minus-button {
+  background: #eeeeee;
+}
+
+.plus-button {
+  background: #eeeeee;
+}
+
+.counter-controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.count-label {
+  font-size: 13px;
+}
+
+.export-button {
+  width: 100%;
+  margin-top: 20px;
+  padding: 14px;
+  border: none;
+  border-radius: 9px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.footer-note {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.counter-loading {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 18px;
+}
+
+@media (max-width: 600px) {
+
+  .counter-page {
+    padding: 14px;
+  }
+
+  .counter-header {
+    align-items: flex-start;
+  }
+
+  .app-title {
+    font-size: 22px;
+  }
+
+  .top-section {
+    grid-template-columns: 1fr;
+  }
+
+  .vehicle-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .vehicle-card {
+    padding: 14px 8px;
+  }
+
+  .vehicle-name {
+    font-size: 15px;
+  }
+
+  .vehicle-count {
+    font-size: 28px;
+  }
+
+  .counter-controls {
+    gap: 6px;
+  }
+
+  .counter-controls button {
+    width: 40px;
+    height: 38px;
+  }
+}
+/* Traffic column headings */
+.traffic-column-headings {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 10px;
+  text-align: center;
+  font-weight: 700;
+  color: #5f6680;
+}
+
+.traffic-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.traffic-summary-box {
+  padding: 14px;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid #e4e6ec;
+  background: #ffffff;
+}
+
+.traffic-summary-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.traffic-summary-number {
+  font-size: 28px;
+  font-weight: 800;
+  margin-top: 3px;
+}
+
+.vehicle-card {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.vehicle-info {
+  text-align: center;
+}
+
+.traffic-counter {
+  text-align: center;
+}
+
+.traffic-counter .vehicle-count {
+  margin-bottom: 8px;
+}
+
+.traffic-counter .counter-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.traffic-counter .minus-button,
+.traffic-counter .plus-button {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+}
+
+@media (max-width: 600px) {
+
+  .traffic-column-headings,
+  .vehicle-card {
+    grid-template-columns: 1.1fr 1fr 1fr;
+    gap: 6px;
+  }
+
+  .traffic-column-headings {
+    font-size: 12px;
+  }
+
+  .vehicle-name {
+    font-size: 14px;
+  }
+
+  .traffic-counter .minus-button,
+  .traffic-counter .plus-button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .traffic-counter .counter-controls {
+    gap: 4px;
+  }
+}
