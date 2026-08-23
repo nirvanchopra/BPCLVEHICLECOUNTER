@@ -36,6 +36,8 @@ export async function exportDayToExcel(date, shift) {
   }
 
   /*
+    SHIFT TIMINGS
+
     Morning:
     09:00 AM - 09:00 PM
 
@@ -43,22 +45,24 @@ export async function exportDayToExcel(date, shift) {
     09:00 PM - 09:00 AM
   */
 
-  let startHour
-  let numberOfHours = 12
+  const startHour =
+    shift === 'Morning' ? 9 : 21
 
-  if (shift === 'Morning') {
-    startHour = 9
-  } else {
-    startHour = 21
-  }
+  const numberOfHours = 12
 
-  // Create hourly slots
+  // -----------------------------------------
+  // CREATE HOURLY SLOTS
+  // -----------------------------------------
+
   const slots = {}
 
   for (let i = 0; i < numberOfHours; i++) {
 
-    const hour = (startHour + i) % 24
-    const nextHour = (hour + 1) % 24
+    const hour =
+      (startHour + i) % 24
+
+    const nextHour =
+      (hour + 1) % 24
 
     const label =
       `${String(hour).padStart(2, '0')}:00-${String(nextHour).padStart(2, '0')}:00`
@@ -66,24 +70,33 @@ export async function exportDayToExcel(date, shift) {
     slots[label] = {}
 
     VEHICLE_ORDER.forEach(vehicle => {
+
       slots[label][vehicle] = {
         TURN_IN: 0,
         PASS_THROUGH: 0
       }
+
     })
   }
 
-  // Put every vehicle into its correct time slot
+  // -----------------------------------------
+  // PUT EVENTS INTO HOURLY SLOTS
+  // -----------------------------------------
+
   data?.forEach(row => {
 
-    const dateObj = new Date(row.created_at)
-    const hour = dateObj.getHours()
+    const dateObj =
+      new Date(row.created_at)
 
-    let slotHour = false
+    const hour =
+      dateObj.getHours()
+
+    let slotHour = null
 
     for (let i = 0; i < numberOfHours; i++) {
 
-      const currentHour = (startHour + i) % 24
+      const currentHour =
+        (startHour + i) % 24
 
       if (hour === currentHour) {
         slotHour = currentHour
@@ -91,9 +104,12 @@ export async function exportDayToExcel(date, shift) {
       }
     }
 
-    if (slotHour === false) return
+    if (slotHour === null) {
+      return
+    }
 
-    const nextHour = (slotHour + 1) % 24
+    const nextHour =
+      (slotHour + 1) % 24
 
     const label =
       `${String(slotHour).padStart(2, '0')}:00-${String(nextHour).padStart(2, '0')}:00`
@@ -103,34 +119,56 @@ export async function exportDayToExcel(date, shift) {
       slots[label][row.vehicle_type] &&
       row.traffic_type
     ) {
+
       slots[label][row.vehicle_type][row.traffic_type]++
+
     }
+
   })
 
+  // -----------------------------------------
+  // EXCEL HEADER
+  // -----------------------------------------
+
   /*
-    HEADER
+  
+  Time Slot
 
-    Row 1:
-    Time Slot | 2 Wheeler | Car/SUV | LCV | ...
+  2 Wheeler
+      Turn-In | Pass-Through | Highway
 
-    Row 2:
-              | Turn In | Pass Through | Turn In | Pass Through ...
+  Car / SUV
+      Turn-In | Pass-Through | Highway
+
+  LCV
+      Turn-In | Pass-Through | Highway
+
+  ...
+
+  Highway Total
+  Turn-In Total
+  Turn-In %
+
   */
 
   const headerRow1 = ['Time Slot']
   const headerRow2 = ['']
 
   VEHICLE_ORDER.forEach(vehicle => {
+
     headerRow1.push(LABELS[vehicle])
     headerRow1.push('')
-    
-    headerRow2.push('Turn In')
-    headerRow2.push('Pass Through')
+    headerRow1.push('')
+
+    headerRow2.push('Turn-In')
+    headerRow2.push('Pass-Through')
+    headerRow2.push('Highway')
+
   })
 
-  headerRow1.push('Total')
-  headerRow1.push('Total Turn In')
-  headerRow1.push('% Turn In')
+  headerRow1.push('Highway Total')
+  headerRow1.push('Turn-In Total')
+  headerRow1.push('Turn-In %')
 
   headerRow2.push('')
   headerRow2.push('')
@@ -141,97 +179,143 @@ export async function exportDayToExcel(date, shift) {
     headerRow2
   ]
 
-  // Grand totals
+  // -----------------------------------------
+  // GRAND TOTALS
+  // -----------------------------------------
+
   const grandTotal = {}
 
   VEHICLE_ORDER.forEach(vehicle => {
+
     grandTotal[vehicle] = {
       TURN_IN: 0,
-      PASS_THROUGH: 0
-    }
-  })
-
-  let grandTotalVehicles = 0
-  let grandTotalTurnIn = 0
-
-  // Add hourly rows
-  Object.entries(slots).forEach(([timeSlot, counts]) => {
-
-    let rowTotal = 0
-    let rowTurnIn = 0
-
-    const row = [timeSlot]
-
-    VEHICLE_ORDER.forEach(vehicle => {
-
-      const turnIn = counts[vehicle].TURN_IN
-      const passThrough = counts[vehicle].PASS_THROUGH
-
-      row.push(turnIn)
-      row.push(passThrough)
-
-      rowTurnIn += turnIn
-      rowTotal += turnIn + passThrough
-
-      grandTotal[vehicle].TURN_IN += turnIn
-      grandTotal[vehicle].PASS_THROUGH += passThrough
-    })
-
-    // Total
-    row.push(rowTotal)
-
-    // Total Turn In
-    row.push(rowTurnIn)
-
-    // Percentage
-    const percentage =
-      rowTotal > 0
-        ? ((rowTurnIn / rowTotal) * 100).toFixed(2) + '%'
-        : '0.00%'
-
-    row.push(percentage)
-
-    // Only show hours where something was counted
-    if (rowTotal > 0) {
-      rows.push(row)
+      PASS_THROUGH: 0,
+      HIGHWAY: 0
     }
 
-    grandTotalVehicles += rowTotal
-    grandTotalTurnIn += rowTurnIn
   })
 
-  // Grand Total row
+  let grandHighwayTotal = 0
+  let grandTurnInTotal = 0
+
+  // -----------------------------------------
+  // HOURLY ROWS
+  // -----------------------------------------
+
+  Object.entries(slots).forEach(
+    ([timeSlot, counts]) => {
+
+      let rowHighwayTotal = 0
+      let rowTurnInTotal = 0
+
+      const row = [timeSlot]
+
+      VEHICLE_ORDER.forEach(vehicle => {
+
+        const turnIn =
+          counts[vehicle].TURN_IN
+
+        const passThrough =
+          counts[vehicle].PASS_THROUGH
+
+        // IMPORTANT:
+        // Highway = Turn-In + Pass-Through
+        const highway =
+          turnIn + passThrough
+
+        row.push(turnIn)
+        row.push(passThrough)
+        row.push(highway)
+
+        rowTurnInTotal += turnIn
+        rowHighwayTotal += highway
+
+        grandTotal[vehicle].TURN_IN += turnIn
+        grandTotal[vehicle].PASS_THROUGH += passThrough
+        grandTotal[vehicle].HIGHWAY += highway
+
+      })
+
+      // Highway Total
+      row.push(rowHighwayTotal)
+
+      // Turn-In Total
+      row.push(rowTurnInTotal)
+
+      // Turn-In %
+      const percentage =
+        rowHighwayTotal > 0
+          ? (
+              (rowTurnInTotal /
+                rowHighwayTotal) *
+              100
+            ).toFixed(2) + '%'
+          : '0.00%'
+
+      row.push(percentage)
+
+      // Only show hours where something happened
+      if (rowHighwayTotal > 0) {
+        rows.push(row)
+      }
+
+      grandHighwayTotal +=
+        rowHighwayTotal
+
+      grandTurnInTotal +=
+        rowTurnInTotal
+
+    }
+  )
+
+  // -----------------------------------------
+  // GRAND TOTAL ROW
+  // -----------------------------------------
+
   const grandRow = ['Grand Total']
 
   VEHICLE_ORDER.forEach(vehicle => {
 
-    grandRow.push(grandTotal[vehicle].TURN_IN)
-    grandRow.push(grandTotal[vehicle].PASS_THROUGH)
+    grandRow.push(
+      grandTotal[vehicle].TURN_IN
+    )
+
+    grandRow.push(
+      grandTotal[vehicle].PASS_THROUGH
+    )
+
+    grandRow.push(
+      grandTotal[vehicle].HIGHWAY
+    )
 
   })
 
-  grandRow.push(grandTotalVehicles)
-  grandRow.push(grandTotalTurnIn)
+  grandRow.push(grandHighwayTotal)
+  grandRow.push(grandTurnInTotal)
 
   const grandPercentage =
-    grandTotalVehicles > 0
-      ? ((grandTotalTurnIn / grandTotalVehicles) * 100).toFixed(2) + '%'
+    grandHighwayTotal > 0
+      ? (
+          (grandTurnInTotal /
+            grandHighwayTotal) *
+          100
+        ).toFixed(2) + '%'
       : '0.00%'
 
   grandRow.push(grandPercentage)
 
   rows.push(grandRow)
 
-  // Create worksheet
-  const worksheet = XLSX.utils.aoa_to_sheet(rows)
+  // -----------------------------------------
+  // CREATE WORKSHEET
+  // -----------------------------------------
 
-  /*
-    Merge vehicle headers
+  const worksheet =
+    XLSX.utils.aoa_to_sheet(rows)
 
-    2 Wheeler -> Turn In / Pass Through
-    Car/SUV   -> Turn In / Pass Through
-    etc.
-  */
+  // -----------------------------------------
+  // MERGE HEADERS
+  // -----------------------------------------
 
   worksheet['!merges'] = []
 
@@ -240,57 +324,106 @@ export async function exportDayToExcel(date, shift) {
   VEHICLE_ORDER.forEach(() => {
 
     worksheet['!merges'].push({
-      s: { r: 0, c: column },
-      e: { r: 0, c: column + 1 }
+      s: {
+        r: 0,
+        c: column
+      },
+
+      e: {
+        r: 0,
+        c: column + 2
+      }
     })
 
-    column += 2
+    column += 3
+
   })
 
-  // Merge Time Slot vertically
+  // Time Slot
   worksheet['!merges'].push({
-    s: { r: 0, c: 0 },
-    e: { r: 1, c: 0 }
+    s: {
+      r: 0,
+      c: 0
+    },
+
+    e: {
+      r: 1,
+      c: 0
+    }
   })
 
-  // Merge Total vertically
+  // Highway Total
   worksheet['!merges'].push({
-    s: { r: 0, c: column },
-    e: { r: 1, c: column }
+    s: {
+      r: 0,
+      c: column
+    },
+
+    e: {
+      r: 1,
+      c: column
+    }
   })
 
+  // Turn-In Total
   worksheet['!merges'].push({
-    s: { r: 0, c: column + 1 },
-    e: { r: 1, c: column + 1 }
+    s: {
+      r: 0,
+      c: column + 1
+    },
+
+    e: {
+      r: 1,
+      c: column + 1
+    }
   })
 
+  // Turn-In %
   worksheet['!merges'].push({
-    s: { r: 0, c: column + 2 },
-    e: { r: 1, c: column + 2 }
+    s: {
+      r: 0,
+      c: column + 2
+    },
+
+    e: {
+      r: 1,
+      c: column + 2
+    }
   })
 
-  // Column widths
+  // -----------------------------------------
+  // COLUMN WIDTHS
+  // -----------------------------------------
+
   worksheet['!cols'] = [
-    { wch: 18 },
+    { wch: 20 },
 
     ...VEHICLE_ORDER.flatMap(() => [
-      { wch: 12 },
-      { wch: 14 }
+      { wch: 11 }, // Turn-In
+      { wch: 14 }, // Pass-Through
+      { wch: 11 }  // Highway
     ]),
 
-    { wch: 12 },
-    { wch: 16 },
-    { wch: 12 }
+    { wch: 15 }, // Highway Total
+    { wch: 15 }, // Turn-In Total
+    { wch: 12 }  // Turn-In %
   ]
 
-  // Freeze header
+  // -----------------------------------------
+  // FREEZE HEADER
+  // -----------------------------------------
+
   worksheet['!freeze'] = {
     xSplit: 1,
     ySplit: 2
   }
 
-  // Create workbook
-  const workbook = XLSX.utils.book_new()
+  // -----------------------------------------
+  // CREATE WORKBOOK
+  // -----------------------------------------
+
+  const workbook =
+    XLSX.utils.book_new()
 
   XLSX.utils.book_append_sheet(
     workbook,
@@ -298,7 +431,10 @@ export async function exportDayToExcel(date, shift) {
     `${shift} Summary`
   )
 
-  // File name
+  // -----------------------------------------
+  // DOWNLOAD
+  // -----------------------------------------
+
   XLSX.writeFile(
     workbook,
     `BPCL-Vehicle-Count-${date}-${shift}.xlsx`

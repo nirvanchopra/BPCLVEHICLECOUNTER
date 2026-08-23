@@ -46,7 +46,7 @@ function Counter({ session }) {
 
   const [todayCounts, setTodayCounts] = useState({
     TURN_IN: {},
-    PASS_THROUGH: {}
+    PASS_THROUGH: {},
   })
 
   const [loading, setLoading] = useState(false)
@@ -58,7 +58,7 @@ function Counter({ session }) {
   }, [shift])
 
   // -----------------------------------------
-  // LOAD BOTH TRAFFIC TYPES
+  // LOAD COUNTS
   // -----------------------------------------
   const loadTodayCounts = async () => {
     const { data, error } = await supabase
@@ -74,11 +74,10 @@ function Counter({ session }) {
 
     const counts = {
       TURN_IN: {},
-      PASS_THROUGH: {}
+      PASS_THROUGH: {},
     }
 
     data?.forEach(row => {
-
       if (!counts[row.traffic_type]) {
         return
       }
@@ -91,13 +90,9 @@ function Counter({ session }) {
   }
 
   // -----------------------------------------
-  // ADD ONE VEHICLE
+  // ADD VEHICLE
   // -----------------------------------------
-  const handleIncrease = async (
-    vehicleType,
-    trafficType
-  ) => {
-
+  const handleIncrease = async (vehicleType, trafficType) => {
     setLoading(true)
 
     const { error } = await supabase
@@ -107,15 +102,14 @@ function Counter({ session }) {
         user_id: session.user.id,
         shift,
         count_date: shiftDate,
-        traffic_type: trafficType
+        traffic_type: trafficType,
       })
 
     if (error) {
       console.error('Error counting vehicle:', error)
 
       alert(
-        'Could not save count: ' +
-        error.message
+        'Could not save count: ' + error.message
       )
 
       setLoading(false)
@@ -129,21 +123,20 @@ function Counter({ session }) {
         ...prev[trafficType],
 
         [vehicleType]:
-          (prev[trafficType][vehicleType] || 0) + 1
-      }
+          (prev[trafficType][vehicleType] || 0) + 1,
+      },
     }))
 
     setLoading(false)
   }
 
   // -----------------------------------------
-  // REMOVE ONE VEHICLE
+  // REMOVE VEHICLE
   // -----------------------------------------
   const handleDecrease = async (
     vehicleType,
     trafficType
   ) => {
-
     const currentCount =
       todayCounts[trafficType]?.[vehicleType] || 0
 
@@ -152,19 +145,24 @@ function Counter({ session }) {
     }
 
     /*
-      Find the latest matching entry created
-      by the current logged-in user.
+      Turn-In minus:
+      removes the latest TURN_IN entry.
+
+      Highway minus:
+      removes the latest PASS_THROUGH entry.
+
+      This keeps the database logically correct.
     */
+
     const { data, error } = await supabase
       .from('vehicle_events')
       .select('id')
       .eq('vehicle_type', vehicleType)
-      //.eq('user_id', session.user.id)
       .eq('shift', shift)
       .eq('count_date', shiftDate)
       .eq('traffic_type', trafficType)
       .order('created_at', {
-        ascending: false
+        ascending: false,
       })
       .limit(1)
       .maybeSingle()
@@ -181,9 +179,8 @@ function Counter({ session }) {
 
     if (!data) {
       alert(
-  'There is no matching vehicle entry to decrease.'
-)
-
+        'There is no matching vehicle entry to decrease.'
+      )
       return
     }
 
@@ -215,14 +212,14 @@ function Counter({ session }) {
 
         [vehicleType]: Math.max(
           0,
-          (prev[trafficType][vehicleType] || 1) - 1
-        )
-      }
+          (prev[trafficType][vehicleType] || 0) - 1
+        ),
+      },
     }))
   }
 
   // -----------------------------------------
-  // TOTALS
+  // TOTAL TURN-IN
   // -----------------------------------------
   const turnInTotal =
     VEHICLE_TYPES.reduce(
@@ -232,6 +229,9 @@ function Counter({ session }) {
       0
     )
 
+  // -----------------------------------------
+  // TOTAL PASS-THROUGH
+  // -----------------------------------------
   const passThroughTotal =
     VEHICLE_TYPES.reduce(
       (total, vehicle) =>
@@ -240,8 +240,21 @@ function Counter({ session }) {
       0
     )
 
-  const totalVehicles =
+  // -----------------------------------------
+  // HIGHWAY TOTAL
+  //
+  // HIGHWAY = TURN-IN + PASS-THROUGH
+  // -----------------------------------------
+  const highwayTotal =
     turnInTotal + passThroughTotal
+
+  // -----------------------------------------
+  // TURN-IN PERCENTAGE
+  // -----------------------------------------
+  const turnInPercentage =
+    highwayTotal > 0
+      ? ((turnInTotal / highwayTotal) * 100).toFixed(2)
+      : '0.00'
 
   return (
     <div className="counter-page">
@@ -292,24 +305,23 @@ function Counter({ session }) {
           </select>
 
           <div className="shift-time">
-
             {shift === 'Morning'
               ? '09:00 AM — 09:00 PM'
               : '09:00 PM — 09:00 AM'}
-
           </div>
 
         </div>
 
 
+        {/* HIGHWAY TOTAL */}
         <div className="total-box">
 
           <div className="total-label">
-            Total Vehicles
+            Highway Total
           </div>
 
           <div className="total-number">
-            {totalVehicles}
+            {highwayTotal}
           </div>
 
           <div className="total-date">
@@ -324,7 +336,9 @@ function Counter({ session }) {
       {/* TRAFFIC SUMMARY */}
       <div className="traffic-summary">
 
+        {/* TURN-IN */}
         <div className="traffic-summary-box turn-in-summary">
+
           <div className="traffic-summary-title">
             ↪ Turn-In
           </div>
@@ -332,27 +346,47 @@ function Counter({ session }) {
           <div className="traffic-summary-number">
             {turnInTotal}
           </div>
+
         </div>
 
+
+        {/* HIGHWAY */}
         <div className="traffic-summary-box highway-summary">
+
           <div className="traffic-summary-title">
             → Highway
           </div>
 
           <div className="traffic-summary-number">
-            {passThroughTotal}
+            {highwayTotal}
           </div>
+
+        </div>
+
+
+        {/* PERCENTAGE */}
+        <div className="traffic-summary-box percentage-summary">
+
+          <div className="traffic-summary-title">
+            Turn-In %
+          </div>
+
+          <div className="traffic-summary-number">
+            {turnInPercentage}%
+          </div>
+
         </div>
 
       </div>
 
 
-      {/* COLUMN HEADINGS */}
+      {/* VEHICLE COUNT */}
       <div className="section-title">
         Vehicle Count
       </div>
 
 
+      {/* COLUMN HEADINGS */}
       <div className="traffic-column-headings">
 
         <div>
@@ -376,12 +410,25 @@ function Counter({ session }) {
         {VEHICLE_TYPES.map(vehicle => {
 
           const turnInCount =
-            todayCounts.TURN_IN[vehicle.key] || 0
+            todayCounts.TURN_IN[
+              vehicle.key
+            ] || 0
 
           const passThroughCount =
             todayCounts.PASS_THROUGH[
               vehicle.key
             ] || 0
+
+          /*
+            IMPORTANT:
+
+            Highway count is NOT stored separately.
+
+            Highway =
+            Turn-In + Pass-Through
+          */
+          const highwayCount =
+            turnInCount + passThroughCount
 
           return (
             <div
@@ -450,10 +497,18 @@ function Counter({ session }) {
               <div className="traffic-counter">
 
                 <div className="vehicle-count">
-                  {passThroughCount}
+                  {highwayCount}
                 </div>
 
                 <div className="counter-controls">
+
+                  {/*
+                    Highway + means:
+                    PASS-THROUGH vehicle.
+
+                    If Turn-In is pressed,
+                    Highway automatically increases too.
+                  */}
 
                   <button
                     className="minus-button"
@@ -511,7 +566,7 @@ function Counter({ session }) {
 
 
       <div className="footer-note">
-        All counts are automatically saved to the database.
+        Turn-In vehicles are included in Highway Total.
       </div>
 
     </div>
