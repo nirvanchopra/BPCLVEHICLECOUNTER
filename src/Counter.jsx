@@ -60,34 +60,49 @@ function Counter({ session }) {
   // -----------------------------------------
   // LOAD COUNTS
   // -----------------------------------------
-  const loadTodayCounts = async () => {
+ const loadTodayCounts = async () => {
+  let allData = []
+  let from = 0
+  const pageSize = 1000
+
+  while (true) {
     const { data, error } = await supabase
       .from('vehicle_events')
       .select('vehicle_type, traffic_type')
       .eq('count_date', shiftDate)
       .eq('shift', shift)
+      .range(from, from + pageSize - 1)
 
     if (error) {
       console.error('Error loading counts:', error)
       return
     }
 
-    const counts = {
-      TURN_IN: {},
-      PASS_THROUGH: {},
+    allData = [...allData, ...(data || [])]
+
+    if (!data || data.length < pageSize) {
+      break
     }
 
-    data?.forEach(row => {
-      if (!counts[row.traffic_type]) {
-        return
-      }
-
-      counts[row.traffic_type][row.vehicle_type] =
-        (counts[row.traffic_type][row.vehicle_type] || 0) + 1
-    })
-
-    setTodayCounts(counts)
+    from += pageSize
   }
+
+  const counts = {
+    TURN_IN: {},
+    PASS_THROUGH: {},
+  }
+
+  allData.forEach(row => {
+    if (!counts[row.traffic_type]) {
+      return
+    }
+
+    counts[row.traffic_type][row.vehicle_type] =
+      (counts[row.traffic_type][row.vehicle_type] || 0) + 1
+  })
+
+  setTodayCounts(counts)
+}
 
   // -----------------------------------------
   // ADD VEHICLE

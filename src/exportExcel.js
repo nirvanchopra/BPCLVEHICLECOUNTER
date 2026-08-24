@@ -23,17 +23,46 @@ const LABELS = {
 
 export async function exportDayToExcel(date, shift) {
 
-  // Get all records for this shift
-  const { data, error } = await supabase
-    .from('vehicle_events')
-    .select('vehicle_type, traffic_type, created_at')
-    .eq('count_date', date)
-    .eq('shift', shift)
+  // =====================================================
+  // GET ALL RECORDS
+  // Supabase normally returns max 1000 records per request.
+  // Fetch in batches so Excel gets ALL records.
+  // =====================================================
 
-  if (error) {
-    alert('Could not fetch data: ' + error.message)
-    return
+  let allData = []
+  let from = 0
+  const pageSize = 1000
+
+  while (true) {
+
+    const { data: pageData, error } = await supabase
+      .from('vehicle_events')
+      .select('vehicle_type, traffic_type, created_at')
+      .eq('count_date', date)
+      .eq('shift', shift)
+      .range(from, from + pageSize - 1)
+
+    if (error) {
+      alert('Could not fetch data: ' + error.message)
+      return
+    }
+
+    allData = [
+      ...allData,
+      ...(pageData || [])
+    ]
+
+    // Last batch reached
+    if (!pageData || pageData.length < pageSize) {
+      break
+    }
+
+    from += pageSize
   }
+
+  console.log(
+    `Exporting ${allData.length} vehicle events`
+  )
 
   /*
     SHIFT TIMINGS
@@ -50,9 +79,9 @@ export async function exportDayToExcel(date, shift) {
 
   const numberOfHours = 12
 
-  // -----------------------------------------
+  // =====================================================
   // CREATE HOURLY SLOTS
-  // -----------------------------------------
+  // =====================================================
 
   const slots = {}
 
@@ -79,11 +108,11 @@ export async function exportDayToExcel(date, shift) {
     })
   }
 
-  // -----------------------------------------
+  // =====================================================
   // PUT EVENTS INTO HOURLY SLOTS
-  // -----------------------------------------
+  // =====================================================
 
-  data?.forEach(row => {
+  allData.forEach(row => {
 
     const dateObj =
       new Date(row.created_at)
@@ -116,40 +145,28 @@ export async function exportDayToExcel(date, shift) {
 
     if (
       slots[label] &&
-      slots[label][row.vehicle_type] &&
-      row.traffic_type
+      slots[label][row.vehicle_type]
     ) {
 
-      slots[label][row.vehicle_type][row.traffic_type]++
+      if (row.traffic_type === 'TURN_IN') {
+
+        slots[label][row.vehicle_type].TURN_IN++
+
+      }
+
+      else if (row.traffic_type === 'PASS_THROUGH') {
+
+        slots[label][row.vehicle_type].PASS_THROUGH++
+
+      }
 
     }
 
   })
 
-  // -----------------------------------------
+  // =====================================================
   // EXCEL HEADER
-  // -----------------------------------------
-
-  /*
-  
-  Time Slot
-
-  2 Wheeler
-      Turn-In | Pass-Through | Highway
-
-  Car / SUV
-      Turn-In | Pass-Through | Highway
-
-  LCV
-      Turn-In | Pass-Through | Highway
-
-  ...
-
-  Highway Total
-  Turn-In Total
-  Turn-In %
-
-  */
+  // =====================================================
 
   const headerRow1 = ['Time Slot']
   const headerRow2 = ['']
@@ -179,9 +196,9 @@ export async function exportDayToExcel(date, shift) {
     headerRow2
   ]
 
-  // -----------------------------------------
+  // =====================================================
   // GRAND TOTALS
-  // -----------------------------------------
+  // =====================================================
 
   const grandTotal = {}
 
@@ -198,9 +215,9 @@ export async function exportDayToExcel(date, shift) {
   let grandHighwayTotal = 0
   let grandTurnInTotal = 0
 
-  // -----------------------------------------
+  // =====================================================
   // HOURLY ROWS
-  // -----------------------------------------
+  // =====================================================
 
   Object.entries(slots).forEach(
     ([timeSlot, counts]) => {
@@ -218,8 +235,22 @@ export async function exportDayToExcel(date, shift) {
         const passThrough =
           counts[vehicle].PASS_THROUGH
 
-        // IMPORTANT:
-        // Highway = Turn-In + Pass-Through
+        /*
+          IMPORTANT:
+
+          Turn-In + automatically represents:
+          1 Turn-In vehicle
+          AND therefore 1 Highway vehicle.
+
+          Highway + represents:
+          1 Pass-Through vehicle.
+
+          Therefore:
+
+          HIGHWAY =
+          TURN-IN + PASS-THROUGH
+        */
+
         const highway =
           turnIn + passThrough
 
@@ -230,31 +261,35 @@ export async function exportDayToExcel(date, shift) {
         rowTurnInTotal += turnIn
         rowHighwayTotal += highway
 
-        grandTotal[vehicle].TURN_IN += turnIn
-        grandTotal[vehicle].PASS_THROUGH += passThrough
-        grandTotal[vehicle].HIGHWAY += highway
+        grandTotal[vehicle].TURN_IN +=
+          turnIn
+
+        grandTotal[vehicle].PASS_THROUGH +=
+          passThrough
+
+        grandTotal[vehicle].HIGHWAY +=
+          highway
 
       })
 
-      // Highway Total
-      row.push(rowHighwayTotal)
+      // =================================================
+      // HOURLY TOTALS
+      // =================================================
 
-      // Turn-In Total
+      row.push(rowHighwayTotal)
       row.push(rowTurnInTotal)
 
-      // Turn-In %
       const percentage =
         rowHighwayTotal > 0
           ? (
               (rowTurnInTotal /
-                rowHighwayTotal) *
-              100
+                rowHighwayTotal) * 100
             ).toFixed(2) + '%'
           : '0.00%'
 
       row.push(percentage)
 
-      // Only show hours where something happened
+      // Only show hours with vehicles
       if (rowHighwayTotal > 0) {
         rows.push(row)
       }
@@ -268,27 +303,45 @@ export async function exportDayToExcel(date, shift) {
     }
   )
 
-  // -----------------------------------------
+  // =====================================================
   // GRAND TOTAL ROW
-  // -----------------------------------------
+  // =====================================================
 
   const grandRow = ['Grand Total']
 
   VEHICLE_ORDER.forEach(vehicle => {
 
-    grandRow.push(
+    const turnIn =
       grandTotal[vehicle].TURN_IN
-    )
 
-    grandRow.push(
+    const passThrough =
       grandTotal[vehicle].PASS_THROUGH
-    )
 
-    grandRow.push(
-      grandTotal[vehicle].HIGHWAY
-    )
+    /*
+      FINAL VEHICLE HIGHWAY TOTAL
+
+      Highway = Turn-In + Pass-Through
+    */
+
+    const highway =
+      turnIn + passThrough
+
+    grandRow.push(turnIn)
+    grandRow.push(passThrough)
+    grandRow.push(highway)
 
   })
+
+  // =====================================================
+  // FINAL GRAND TOTAL
+  // =====================================================
+
+  /*
+    Do NOT add Highway again.
+
+    Highway already contains:
+    Turn-In + Pass-Through
+  */
 
   grandRow.push(grandHighwayTotal)
   grandRow.push(grandTurnInTotal)
@@ -297,8 +350,7 @@ export async function exportDayToExcel(date, shift) {
     grandHighwayTotal > 0
       ? (
           (grandTurnInTotal /
-            grandHighwayTotal) *
-          100
+            grandHighwayTotal) * 100
         ).toFixed(2) + '%'
       : '0.00%'
 
@@ -306,16 +358,16 @@ export async function exportDayToExcel(date, shift) {
 
   rows.push(grandRow)
 
-  // -----------------------------------------
+  // =====================================================
   // CREATE WORKSHEET
-  // -----------------------------------------
+  // =====================================================
 
   const worksheet =
     XLSX.utils.aoa_to_sheet(rows)
 
-  // -----------------------------------------
+  // =====================================================
   // MERGE HEADERS
-  // -----------------------------------------
+  // =====================================================
 
   worksheet['!merges'] = []
 
@@ -391,36 +443,38 @@ export async function exportDayToExcel(date, shift) {
     }
   })
 
-  // -----------------------------------------
+  // =====================================================
   // COLUMN WIDTHS
-  // -----------------------------------------
+  // =====================================================
 
   worksheet['!cols'] = [
+
     { wch: 20 },
 
     ...VEHICLE_ORDER.flatMap(() => [
-      { wch: 11 }, // Turn-In
-      { wch: 14 }, // Pass-Through
-      { wch: 11 }  // Highway
+      { wch: 11 },
+      { wch: 14 },
+      { wch: 11 }
     ]),
 
-    { wch: 15 }, // Highway Total
-    { wch: 15 }, // Turn-In Total
-    { wch: 12 }  // Turn-In %
+    { wch: 15 },
+    { wch: 15 },
+    { wch: 12 }
+
   ]
 
-  // -----------------------------------------
+  // =====================================================
   // FREEZE HEADER
-  // -----------------------------------------
+  // =====================================================
 
   worksheet['!freeze'] = {
     xSplit: 1,
     ySplit: 2
   }
 
-  // -----------------------------------------
+  // =====================================================
   // CREATE WORKBOOK
-  // -----------------------------------------
+  // =====================================================
 
   const workbook =
     XLSX.utils.book_new()
@@ -431,9 +485,9 @@ export async function exportDayToExcel(date, shift) {
     `${shift} Summary`
   )
 
-  // -----------------------------------------
+  // =====================================================
   // DOWNLOAD
-  // -----------------------------------------
+  // =====================================================
 
   XLSX.writeFile(
     workbook,
